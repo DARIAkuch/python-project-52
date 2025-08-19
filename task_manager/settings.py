@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'task_manager',
     'django_bootstrap5',
+    'django_filters',
     'task_manager.users.apps.UsersConfig',
+    'task_manager.tasks.apps.TasksConfig',
 ]
 
 MIDDLEWARE = [
