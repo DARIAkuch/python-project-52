@@ -27,7 +27,7 @@ class TasksCreate(AuthRequired, SuccessMessageMixin, CreateView):
     form_class = TasksForm
     template_name = "tasks/create.html"
     success_url = reverse_lazy("tasks:list")
-    success_message = gettext("Task create successfull")
+    success_message = gettext("Task created")
 
     def form_valid(self, form):
         form.instance.creator = self.request.user
