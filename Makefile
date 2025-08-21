@@ -26,3 +26,4 @@ collectstatic:
 
 test:
 	uv run pytest --cov=gendiff --cov-report=xml:coverage.xml
+
