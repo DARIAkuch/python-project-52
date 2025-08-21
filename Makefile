@@ -23,3 +23,6 @@ render-start:
 
 collectstatic:
 	uv run python manage.py collectstatic --noinput
+
+test:
+	uv run pytest --cov=gendiff --cov-report=xml:coverage.xml
