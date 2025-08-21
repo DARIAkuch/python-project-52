@@ -9,8 +9,12 @@ migrate:
 	uv run python3 manage.py makemigrations
 	uv run python3 manage.py migrate
 
-tests:
+test:
 	uv run python3 manage.py test
+
+test-coverage:
+	uv run coverage run --source='.' manage.py test
+	uv run coverage xml
 
 install:
 	uv sync
@@ -24,6 +28,7 @@ render-start:
 collectstatic:
 	uv run python manage.py collectstatic --noinput
 
-test:
-	uv run pytest --cov=gendiff --cov-report=xml:coverage.xml
+lint:
+	uv run ruff check task_manager
 
+check: test lint

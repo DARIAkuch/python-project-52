@@ -26,7 +26,7 @@ class StatusesCreateView(AuthRequired, SuccessMessageMixin, CreateView):
     model = Statuses
     form_class = StatusForm
     success_url = reverse_lazy("statuses:list")
-    success_message = gettext("Status create")
+    success_message = gettext("Status created")
 
 
 class StatusesUpdateView(AuthRequired, SuccessMessageMixin, UpdateView):
