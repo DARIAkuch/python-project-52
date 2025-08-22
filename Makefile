@@ -1,34 +1,45 @@
-dev:
-	uv run python3 manage.py runserver
-
-translate:
-	uv run django-admin makemessages --locale ru
-	uv run python manage.py compilemessages
-
-migrate:
-	uv run python3 manage.py makemigrations
-	uv run python3 manage.py migrate
-
-test:
-	uv run python3 manage.py test
-
-test-coverage:
-	uv run coverage run --source='.' manage.py test
-	uv run coverage xml
-
 install:
 	uv sync
 
-build:
-	./build.sh
+dev-install:
+	uv sync --group dev
 
-render-start:
-	.venv/bin/gunicorn --bind 0.0.0.0:$$PORT task_manager.wsgi
+migrate:
+	uv run python manage.py migrate
 
 collectstatic:
 	uv run python manage.py collectstatic --noinput
 
-lint:
-	uv run ruff check task_manager
+run:
+	uv run python manage.py runserver
 
-check: test lint
+render-start:
+	uv run gunicorn task_manager.wsgi
+
+build:
+	./build.sh
+
+lint:
+	uv run ruff check
+
+lint-fix:
+	uv run ruff check --fix
+
+test:
+	uv run pytest --ds=task_manager.settings --reuse-db
+
+coverage:
+	uv run coverage run --omit='*/migrations/*,*/settings.py,*/venv/*,*/.venv/*' -m pytest --ds=task_manager.settings
+	uv run coverage report --show-missing --skip-covered
+
+ci-install:
+	uv sync --group dev
+
+ci-migrate:
+	uv run python manage.py makemigrations --noinput && \
+	uv run python manage.py migrate --noinput
+
+ci-test:
+	uv run coverage run --omit='*/migrations/*,*/settings.py,*/venv/*,*/.venv/*' -m pytest --ds=task_manager.settings --reuse-db
+	uv run coverage xml
+	uv run coverage report --show-missing --skip-covered

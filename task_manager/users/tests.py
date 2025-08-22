@@ -1,87 +1,87 @@
+import pytest
+from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
-from django.contrib.auth import get_user_model
-from django.core.exceptions import ObjectDoesNotExist
+
+from task_manager.statuses.models import Status
+from task_manager.tasks.models import Task
+
+User = get_user_model()
 
 
-class UserTest(TestCase):
-    def test_create(self):
-        data_user = {
-            "username": "volkovor777228",
-            "first_name": "Lev",
-            "last_name": "Smith",
-            "password1": "1234",
-            "password2": "1234",
+@pytest.mark.django_db
+class UserCRUDTests(TestCase):
+    fixtures = ['users.json']
+
+    def setUp(self):
+        self.user1 = User.objects.get(pk=1)
+        self.user2 = User.objects.get(pk=2)
+        self.user3 = User.objects.get(pk=3)
+
+        for user in [self.user1, self.user2, self.user3]:
+            user.set_password('testpass123')
+            user.save()
+
+    def test_user_registration(self):
+        initial_users = User.objects.count()
+
+        url = reverse('user_create')
+        data = {
+            'username': 'newuser',
+            'password1': 'newpass123',  # NOSONAR
+            'password2': 'newpass123',  # NOSONAR
+            'first_name': 'New',
+            'last_name': 'User'
         }
-        response = self.client.post(reverse("users:create"), data_user)
-        self.assertRedirects(response, reverse("login"))
+        response = self.client.post(url, data)
 
-        # Проверка, что пользователь был создан
-        User = get_user_model()
-        self.assertTrue(User.objects.filter(username="volkovor777228").exists())
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(User.objects.count(), initial_users + 1)
+        self.assertTrue(User.objects.filter(username='newuser').exists())
 
+        messages = list(get_messages(response.wsgi_request))
+        assert "успешно" in str(messages[0]).lower()
 
-    def test_update(self):
-        # Создание пользователя
-        data_user = {
-            "username": "volkovor777228",
-            "first_name": "Lev",
-            "last_name": "Smith",
-            "password1": "1234",
-            "password2": "1234",
-        }
-        response = self.client.post(reverse("users:create"), data_user)
-
-        # Вход в систему с правильными данными
-        self.client.login(username=data_user["username"], password="1234")
-
-        # Обновление данных пользователя
-        data_user_update = {
-            "username": "volkovor777228",
-            "first_name": "Lev228",
-            "last_name": "Smith777",
-            "password1": "1234",
-            "password2": "1234",
-        }
-        user = get_user_model().objects.get(username=data_user["username"])
+    def test_user_update_authenticated(self):
+        self.client.login(username='user1', password='testpass123')  # NOSONAR
+        url = reverse('user_update', kwargs={'pk': self.user1.pk})
         response = self.client.post(
-            reverse("users:update", args=[user.id]), data_user_update
+            url,
+            {
+                'username': 'user1',  # NOSONAR
+                'first_name': 'Updated',  # NOSONAR
+                'last_name': 'User',  # NOSONAR
+                'password1': 'newpass123',  # NOSONAR
+                'password2': 'newpass123',  # NOSONAR
+            }
         )
-        # Проверка обновления данных
-        user.refresh_from_db()
-        self.assertEqual(user.first_name, "Lev228")
-        self.assertEqual(user.last_name, "Smith777")
+        self.assertRedirects(response, reverse('users_index'))
+        self.user1.refresh_from_db()
+        self.assertEqual(self.user1.first_name, 'Updated')
+        self.assertTrue(self.user1.check_password('newpass123'))
 
-        # Проверка перенаправления
-        self.assertRedirects(response, reverse("users:list"))
+    def test_user_update_unauthenticated(self):
+        url = reverse('user_update', kwargs={'pk': self.user1.pk})
+        response = self.client.post(url)
 
+        login_url = reverse('login')
+        expected_redirect = f"{login_url}?next={url}"
+        self.assertRedirects(response, expected_redirect)
 
-    def test_delete(self):
-        data_user = {
-            "username": "volkovor777228",
-            "first_name": "Lev228",
-            "last_name": "Smith777",
-            "password1": "1234",
-            "password2": "1234",
-        }
-        response = self.client.post(reverse("users:create"), data_user)
-        self.client.login(username=data_user["username"], password="1234")
-        user = get_user_model().objects.get(username=data_user["username"])
-        response = self.client.post(reverse("users:delete", args=[user.id]))
-        self.assertRedirects(response, reverse("users:list"))
-        with self.assertRaises(ObjectDoesNotExist):
-            get_user_model().objects.get(username=data_user["username"])
+        messages = list(get_messages(response.wsgi_request))
+        assert "не авторизованы" in str(messages[0]).lower()
 
-    def test_read(self):
-        data_user = {
-            "username": "volkovor777228",
-            "first_name": "Lev228",
-            "last_name": "Smith777",
-            "password1": "1234",
-            "password2": "1234",
-        }
-        self.client.post(reverse("users:create"), data_user)
-        user = get_user_model().objects.get(username=data_user["username"])
-        self.assertEqual(user.first_name, data_user["first_name"])
-        self.assertEqual(user.last_name, data_user["last_name"])
-        self.assertEqual(user.username, data_user["username"])
+    def test_cannot_delete_user_with_tasks(self):
+        status = Status.objects.create(name='В работе')
+
+        Task.objects.create(
+            name="Test task",
+            status=status,
+            author=self.user1
+        )
+
+        self.client.login(username='user1', password='testpass123')  # NOSONAR
+        self.client.post(reverse('user_delete', args=[self.user1.pk]))
+
+        self.assertTrue(User.objects.filter(pk=self.user1.pk).exists())
