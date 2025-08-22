@@ -1,53 +1,64 @@
-from django.test import TestCase
+import pytest
+from django.contrib.auth import get_user_model
 from django.urls import reverse
-from django.core.exceptions import ObjectDoesNotExist
-from task_manager.labels.models import Labels
+
+from task_manager.labels.models import Label
+from task_manager.statuses.models import Status
+from task_manager.tasks.models import Task
+
+User = get_user_model()
 
 
-class LabelTest(TestCase):
+@pytest.mark.django_db
+class TestLabelViews:
 
-    def setUp(self):
-        data_user = {
-            "username": "volkovor777228",
-            "first_name": "Lev",
-            "last_name": "Smith",
-            "password1": "1234",
-            "password2": "1234",
-        }
-        self.client.post(reverse("users:create"), data_user)
+    @pytest.fixture
+    def user(self):
+        return User.objects.create_user(
+            username='testuser', password='password123'
+            )
 
-        # Вход в систему с правильными данными
-        self.client.login(username=data_user["username"], password="1234")
+    @pytest.fixture
+    def logged_client(self, client, user):
+        client.login(username='testuser', password='password123')
+        return client
 
-    def test_create(self):
-        data_label = {"name": "enjoy"}
-        response = self.client.post(reverse("labels:create"), data_label)
-        self.assertRedirects(response, reverse("labels:list"))
+    @pytest.fixture
+    def label(self):
+        return Label.objects.create(name='Bug')
 
-        label = Labels.objects.get(name=data_label["name"])
-        self.assertEqual(label.name, data_label["name"])
+    def test_label_list_view(self, logged_client, label):
+        response = logged_client.get(reverse('labels_index'))
+        assert response.status_code == 200
+        assert 'Bug' in response.content.decode()
 
-    def test_update(self):
-        data_label = {"name": "enjoy"}
-        self.client.post(reverse("labels:create"), data_label)
-        label = Labels.objects.get(name=data_label["name"])
+    def test_create_label(self, logged_client):
+        response = logged_client.post(
+            reverse('label_create'),
+            {'name': 'Feature'}
+            )
+        assert response.status_code == 302
+        assert Label.objects.filter(name='Feature').exists()
 
-        self.assertEqual(label.name, data_label["name"])
+    def test_update_label(self, logged_client, label):
+        response = logged_client.post(
+            reverse('label_update', args=[label.id]),
+            {'name': 'Hotfix'}
+            )
+        assert response.status_code == 302
+        label.refresh_from_db()
+        assert label.name == 'Hotfix'
 
-        data_label_update = {"name": "Enjoys"}
-        self.client.post(reverse("labels:update", args=[label.id]),
-                         data_label_update)
-        label_new = Labels.objects.get(name=data_label_update["name"])
-        self.assertEqual(label_new.name, data_label_update["name"])
+    def test_delete_unused_label(self, logged_client, label):
+        response = logged_client.post(reverse('label_delete', args=[label.id]))
+        assert response.status_code == 302
+        assert not Label.objects.filter(id=label.id).exists()
 
-    def test_delete(self):
-        data_label = {"name": "enjoy"}
-        self.client.post(reverse("labels:create"), data_label)
-        label = Labels.objects.get(name=data_label["name"])
+    def test_delete_used_label_protected(self, logged_client, label, user):
+        status = Status.objects.create(name='На паузе')
+        task = Task.objects.create(name='Fix bug', author=user, status=status)
+        task.labels.add(label)
 
-        self.assertEqual(label.name, data_label["name"])
-
-        self.client.post(reverse("labels:delete", args=[label.id]))
-
-        with self.assertRaises(ObjectDoesNotExist):
-            Labels.objects.get(name=data_label["name"])
+        response = logged_client.post(reverse('label_delete', args=[label.id]))
+        assert response.status_code == 302
+        assert Label.objects.filter(id=label.id).exists()
