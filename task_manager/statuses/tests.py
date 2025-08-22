@@ -1,54 +1,59 @@
-from django.test import TestCase
+import pytest
+from django.contrib.auth import get_user_model
 from django.urls import reverse
-from django.core.exceptions import ObjectDoesNotExist
-from task_manager.statuses.models import Statuses
+
+from task_manager.tasks.models import Task
+
+from .models import Status
+
+User = get_user_model()
 
 
-class StatusTest(TestCase):
+@pytest.mark.django_db
+class TestStatusCRUD:
+    @pytest.fixture
+    def logged_client(self, client):
+        User.objects.create_user(username='user1',
+                                 password='testpass123')  # NOSONAR
+        client.login(username='user1', password='testpass123')  # NOSONAR
+        return client
 
-    def setUp(self):
-        data_user = {
-            "username": "volkovor777228",
-            "first_name": "Lev",
-            "last_name": "Smith",
-            "password1": "1234",
-            "password2": "1234",
-        }
-        self.client.post(reverse("users:create"), data_user)
+    def test_create_status(self, logged_client):
+        url = reverse('status_create')
+        response = logged_client.post(url, {'name': 'Новый'})
+        assert response.status_code == 302
+        assert Status.objects.filter(name='Новый').exists()
 
-        # Вход в систему с правильными данными
-        self.client.login(username=data_user["username"], password="1234")
+    def test_update_status(self, logged_client):
+        status = Status.objects.create(name='Старый')
+        url = reverse('status_update', args=[status.pk])
+        logged_client.post(url, {'name': 'Обновленный'})
+        status.refresh_from_db()
+        assert status.name == 'Обновленный'
 
-    def test_create(self):
-        data_status = {"name": "enjoy"}
-        response = self.client.post(reverse("statuses:create"), data_status)
-        self.assertRedirects(response, reverse("statuses:list"))
+    def test_delete_status(self, logged_client):
+        status = Status.objects.create(name='Удалить')
+        url = reverse('status_delete', args=[status.pk])
+        logged_client.post(url)
+        assert not Status.objects.filter(pk=status.pk).exists()
 
-        status = Statuses.objects.get(name=data_status["name"])
-        self.assertEqual(status.name, data_status["name"])
+    def test_status_list_requires_login(self, client):
+        url = reverse('statuses_index')
+        response = client.get(url)
+        assert response.status_code == 302
 
-    def test_update(self):
-        data_status = {"name": "enjoy"}
-        self.client.post(reverse("statuses:create"), data_status)
-        status = Statuses.objects.get(name=data_status["name"])
-
-        self.assertEqual(status.name, data_status["name"])
-
-        data_status_update = {"name": "Enjoys"}
-        self.client.post(
-            reverse("statuses:update", args=[status.id]), data_status_update
+    def test_cannot_delete_status_in_use(self, logged_client):
+        status = Status.objects.create(name='В работе')
+        author = User.objects.get(username='user1')
+        Task.objects.create(
+            name='Test task',
+            status=status,
+            author=author
         )
-        status_new = Statuses.objects.get(name=data_status_update["name"])
-        self.assertEqual(status_new.name, data_status_update["name"])
 
-    def test_delete(self):
-        data_status = {"name": "enjoy"}
-        self.client.post(reverse("statuses:create"), data_status)
-        status = Statuses.objects.get(name=data_status["name"])
+        url = reverse('status_delete', args=[status.pk])
+        response = logged_client.post(url)
 
-        self.assertEqual(status.name, data_status["name"])
+        assert response.status_code == 302
 
-        self.client.post(reverse("statuses:delete", args=[status.id]))
-
-        with self.assertRaises(ObjectDoesNotExist):
-            Statuses.objects.get(name=data_status["name"])
+        assert Status.objects.filter(pk=status.pk).exists()
