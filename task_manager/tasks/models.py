@@ -1,51 +1,50 @@
-from django.db import models
-from django.utils import timezone
-from task_manager.statuses.models import Statuses
 from django.contrib.auth import get_user_model
-from django.utils.translation import gettext_lazy
-from task_manager.labels.models import Labels
+from django.db import models
+from django.utils.translation import gettext_lazy as _
 
-# Create your models here.
+from task_manager.labels.models import Label
+from task_manager.statuses.models import Status
+
+User = get_user_model()
 
 
-class Tasks(models.Model):
-    name = models.CharField(gettext_lazy("name"), max_length=255, unique=True)
+class Task(models.Model):
+    name = models.CharField(max_length=100, verbose_name="Имя")
+    description = models.TextField(blank=True, verbose_name="Описание")
     status = models.ForeignKey(
-        Statuses,
-        related_name="status",
-        blank=False,
+        Status,
         on_delete=models.PROTECT,
-        verbose_name=gettext_lazy("Status"),
+        verbose_name=_('Status'),
+        related_name="tasks"
     )
-    created_at = models.DateTimeField(default=timezone.now)
-    creator = models.ForeignKey(
-        get_user_model(),
+    labels = models.ManyToManyField(
+        Label,
+        related_name='tasks',
+        blank=True,
+        verbose_name=_('Labels')
+    )
+    author = models.ForeignKey(
+        User,
         on_delete=models.PROTECT,
-        related_name="creator",
-        verbose_name=gettext_lazy("Creator"),
+        verbose_name=_('Author'),
+        related_name="authored_tasks"
     )
     executor = models.ForeignKey(
-        get_user_model(),
+        User,
         on_delete=models.PROTECT,
-        related_name="executor",
-        null=True,
+        verbose_name=_('Executor'),
+        related_name="executed_tasks",
         blank=True,
-        verbose_name=gettext_lazy("Executor"),
+        null=True
     )
-    description = models.TextField(gettext_lazy("description"), blank=True)
-    labels = models.ManyToManyField(
-        Labels,
-        through="LabelsTasksReal",
-        related_name="labels",
-        blank=True,
-        verbose_name=gettext_lazy("Labels"),
-    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_('Creation date')
+        )
 
     def __str__(self):
-
         return self.name
 
-
-class LabelsTasksReal(models.Model):
-    task = models.ForeignKey(Tasks, on_delete=models.CASCADE)
-    label = models.ForeignKey(Labels, on_delete=models.CASCADE)
+    class Meta:
+        verbose_name = _('Task')
+        verbose_name_plural = _('Tasks')

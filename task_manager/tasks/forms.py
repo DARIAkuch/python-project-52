@@ -1,9 +1,12 @@
-from django.forms import ModelForm
-from task_manager.tasks.models import Tasks
+from django import forms
+
+from .models import Task
 
 
-class TasksForm(ModelForm):
-
+class TaskForm(forms.ModelForm):
     class Meta:
-        model = Tasks
-        fields = ["name", "description", "status", "executor", "labels"]
+        model = Task
+        fields = ['name', 'description', 'status', 'executor', 'labels']
+        widgets = {
+            'labels': forms.SelectMultiple(attrs={'class': 'form-control'})
+        }
