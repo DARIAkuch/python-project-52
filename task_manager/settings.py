@@ -55,7 +55,6 @@ INSTALLED_APPS = [
     'task_manager.statuses',
     'task_manager.tasks',
     'task_manager.labels',
-    'rollbar',
 ]
 
 AUTH_USER_MODEL = 'users.User'
