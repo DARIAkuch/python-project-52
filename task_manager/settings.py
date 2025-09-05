@@ -30,7 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", False)
+DEBUG = True
 
 ALLOWED_HOSTS = [
     'localhost',
@@ -150,8 +150,8 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 ROLLBAR = {
-    'access_token': os.getenv('ROLLBAR_ACCESS_TOKEN', 'ROLLBAR_TOKEN'),
-    'environment': os.getenv('ROLLBAR_ENV', 'development'),
+    'access_token': 'd6583bfc4c90426ab3db8cf9c210f4af',
+    'environment': 'development' if DEBUG else 'production',
     'code_version': '1.0',
     'root': BASE_DIR,
 }
