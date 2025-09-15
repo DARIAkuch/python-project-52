@@ -21,6 +21,7 @@ from task_manager.users.views import UserLoginView, UserLogoutView
 
 urlpatterns = [
     path('', views.IndexView.as_view(), name='index'),
+    path('trigger-error/', views.trigger_error, name='trigger_error'),
     path('login/', UserLoginView.as_view(), name='login'),
     path('logout/', UserLogoutView.as_view(), name='logout'),
     path('users/', include('task_manager.users.urls')),
